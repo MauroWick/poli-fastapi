@@ -1,3 +1,28 @@
+# Venv installed in src
+/src/*/
+lambda_function.zip
+lambda_layer.zip
+lambda_layer/
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Crash log files
+crash.log
+
+# Ignore override files as they are usually used to override resources locally
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

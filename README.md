@@ -1,34 +1,90 @@
-# poli-fastapi
+# fastapi-lambda/README.md
 
-Verificar a versão do python instalado. Desejável Python 3.12.7.
+# FastAPI AWS Lambda Deployment
 
-```bash
-python3 --version
-# Python 3.12.7
+This project deploys a FastAPI application to AWS Lambda using Terraform. The FastAPI application provides endpoints to retrieve student information.
+
+## Project Structure
+
+```
+terraform-fastapi-lambda
+├── src
+│   ├── main.py          # FastAPI application code
+│   └── requirements.txt  # Python dependencies
+├── main.tf              # Terraform configuration for AWS resources
+├── variables.tf         # Input variables for Terraform
+├── outputs.tf           # Outputs from Terraform deployment
+└── README.md            # Project documentation
 ```
 
-Criar ambiente virtual na pasta do projeto.
+## Prerequisites
 
-```bash
-python3 -m venv .venv
+- AWS Account
+- Terraform installed
+- Python 3.x installed
+
+## Setup Instructions
+
+1. Clone the repository:
+
+   ```
+   git clone <repository-url>
+   cd terraform-fastapi-lambda
+   ```
+
+2. Navigate to the `src` directory and install the required Python packages:
+
+   ```
+   pip install -r requirements.txt
+   ```
+
+3. Configure your AWS credentials. You can do this by setting up the AWS CLI or by exporting environment variables:
+
+   ```
+   export AWS_ACCESS_KEY_ID=<your-access-key>
+   export AWS_SECRET_ACCESS_KEY=<your-secret-key>
+   export AWS_DEFAULT_REGION=<your-region>
+   ```
+
+## Deployment Steps
+
+1. Initialize Terraform:
+
+   ```
+   terraform init
+   ```
+
+2. Plan the deployment:
+
+   ```
+   terraform plan
+   ```
+
+3. Apply the configuration to deploy the FastAPI application:
+
+   ```
+   terraform apply
+   ```
+
+4. After deployment, Terraform will output the API Gateway endpoint URL. You can use this URL to access your FastAPI application.
+
+## Usage
+
+You can access the FastAPI application using the provided API Gateway endpoint. For example:
+
+```
+GET <api-gateway-endpoint>/alunos
+GET <api-gateway-endpoint>/alunos/{aluno_id}
 ```
 
-Ativar ambiente virtual.
+## Cleanup
 
-```bash
-# Linux
-source .venv/bin/activate
+To remove the deployed resources, run:
 
-# Windows
-source .venv/Scripts/activate.ps1
+```
+terraform destroy
 ```
 
-Instalar dependências.
+## License
 
-```bash
-pip install -r requirements.txt
-```
-
-Para rodar o projeto no VS Code:
-
-F5 > Python Debugger > FastApi
+This project is licensed under the MIT License.
