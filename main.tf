@@ -2,13 +2,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-resource "aws_lambda_layer_version" "fastapi_layer" {
-  layer_name          = "fastapi_layer"
-  s3_bucket           = "poli-fastapi-lambda-layer-python200422022025"
-  s3_key              = "lambda_layer.zip"
-  compatible_runtimes = ["python3.12"]
-}
-
 resource "aws_lambda_function" "fastapi_lambda" {
   function_name = var.function_name
   runtime       = var.runtime
@@ -25,8 +18,6 @@ resource "aws_lambda_function" "fastapi_lambda" {
   environment {
     variables = var.env_vars
   }
-
-  layers = [aws_lambda_layer_version.fastapi_layer.arn]
 }
 
 resource "aws_iam_role" "lambda_exec" {
@@ -67,6 +58,10 @@ resource "aws_api_gateway_method" "proxy_method" {
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
   authorization = "NONE"
+
+  request_parameters = {
+    "method.request.header.Content-Type" = true
+  }
 }
 
 resource "aws_api_gateway_integration" "lambda_integration" {
@@ -77,6 +72,12 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.fastapi_lambda.invoke_arn
+
+  request_parameters = {
+    "integration.request.header.Content-Type" = "method.request.header.Content-Type"
+  }
+
+  passthrough_behavior = "WHEN_NO_MATCH"
 }
 
 resource "aws_api_gateway_deployment" "fastapi_deployment" {

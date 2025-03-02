@@ -1,46 +1,86 @@
-import re
-import requests
-from fastapi import FastAPI, HTTPException
-from mangum import Mangum
-from .models import Aluno, SpreadsheetLink
-from .fakes import fake_aluno, fake_alunos
-from fastapi import UploadFile, File
-import pandas as pd
-import io
 import json
+import io
+import re
+
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from pydantic import BaseModel
+from mangum import Mangum
+import pandas as pd
+
 
 app = FastAPI()
+
+
+
+class Aluno(BaseModel):
+    nome: str
+    email: str
+    universidade: str
+    curso: int
+    ano_graduacao: int
+    telefone: str
+    cidade: str
+    estado: str
+    pais: str
+    cpf: str
+    modalidade_estagio: str
+    competencias: list
+    ja_estagiou: bool
+    autoriza_dados: bool
+
+
+fake_aluno = Aluno(
+    nome="John Doe",
+    email="johndoe@example.com",
+    universidade="Universidade Exemplo",
+    curso=1,
+    ano_graduacao=2024,
+    telefone="123456789",
+    cidade="Cidade Exemplo",
+    estado="Estado Exemplo",
+    pais="Pais Exemplo",
+    cpf="12345678900",
+    modalidade_estagio="Remoto",
+    competencias=["Python", "FastAPI"],
+    ja_estagiou=True,
+    autoriza_dados=True
+)
+fake_alunos = [
+    Aluno(
+        nome=f"John Doe {i}",
+        email=f"johndoe{i}@example.com",
+        universidade="Universidade Exemplo",
+        curso=1,
+        ano_graduacao=2024,
+        telefone=f"12345678{i}",
+        cidade="Cidade Exemplo",
+        estado="Estado Exemplo",
+        pais="Pais Exemplo",
+        cpf=f"1234567890{i}",
+        modalidade_estagio="Remoto",
+        competencias=["Python", "FastAPI"],
+        ja_estagiou=True,
+        autoriza_dados=True
+    ) for i in range(10)
+]
+
 
 @app.get("/alunos/{aluno_id}", response_model=Aluno)
 async def get_aluno(aluno_id: int):
     return fake_aluno
 
+
 @app.get("/alunos", response_model=list[Aluno])
 async def get_alunos():
     return fake_alunos
 
-@app.post("/validate_spreadsheet_link")
-async def validate_spreadsheet_link(link: SpreadsheetLink):
-    try:
-        response = requests.get(link.url)
-        status = response.status_code
-        if status == 200:
-            return {"message": f"Link {link.url} válido"}
-        elif status == 401:
-            raise HTTPException(status_code=status, detail="Não autorizado")
-        elif status == 404:
-            raise HTTPException(status_code=status, detail="Link não encontrado")
-        else:
-            raise HTTPException(status_code=status, detail=response.reason)
-    except requests.RequestException:
-        raise HTTPException(status_code=400, detail="Erro ao acessar o link")
 
 @app.post("/upload_spreadsheet")
 async def upload_spreadsheet(file: UploadFile = File(...)):
     contents = await file.read()
 
     if not re.match(r".*\.xlsx$", file.filename):
-        return HTTPException(status_code=400, detail="Arquivo deve ser um .xlsx") 
+        return HTTPException(status_code=400, detail="Arquivo deve ser um .xlsx")
     elif not file.content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
         return HTTPException(status_code=400, detail="Arquivo deve ser um .xlsx") 
 
@@ -48,8 +88,6 @@ async def upload_spreadsheet(file: UploadFile = File(...)):
         json_data = _spreadsheet_to_json(contents)
         return json_data
     except Exception as e:
-
-
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -98,7 +136,7 @@ def _spreadsheet_to_json(spreadsheet):
         'Já estagiou?/ Está estagiando?',
         'Você autoriza o compartilhamento dos seus dados para os bancos de talentos das empresas presentes no WI34?',
         'Email institucional',
-        'Aberto a propostas de trabalho',from mangum import Mangum
+        'Aberto a propostas de trabalho',
         'Áreas de interesse',
         'Organizações estudantis',
         'LinkedIn',

@@ -3,6 +3,8 @@
 lambda_function.zip
 lambda_layer.zip
 lambda_layer/
+six.py
+typing_extensions.py
 
 # Terraform files
 *.tfstate
