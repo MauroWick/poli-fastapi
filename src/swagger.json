@@ -1,0 +1,209 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Poli-API",
+    "version": "1.0.0",
+    "description": "API para upload e processamento de planilhas de alunos. Envie um arquivo XLSX contendo os cadastros dos alunos. Se o arquivo for validado com sucesso, a API retorna os registros formatados; caso contrário, retorna um JSON com as críticas detalhadas."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Servidor de desenvolvimento"
+    }
+  ],
+  "paths": {
+    "/upload_spreadsheet": {
+      "post": {
+        "tags": [
+          "Planilha"
+        ],
+        "summary": "Upload e validação de planilha XLSX",
+        "description": "Envie um arquivo XLSX contendo os cadastros dos alunos. Se todos os dados estiverem corretos e as restrições forem atendidas, a resposta retornará os registros validados. Caso contrário, a resposta incluirá críticas detalhadas para cada registro inválido.",
+        "requestBody": {
+          "description": "Arquivo XLSX com os dados dos alunos.",
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Arquivo XLSX contendo os dados dos alunos."
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Planilha processada com sucesso. Retorna os registros de alunos validados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "sucesso"
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Lista dos cadastros de alunos validados.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nome": {
+                            "type": "string",
+                            "example": "Exemplo Aluno 1"
+                          },
+                          "email": {
+                            "type": "string",
+                            "example": "aluno1@exemplo.com"
+                          },
+                          "universidade": {
+                            "type": "string",
+                            "example": "Exemplo Universidade"
+                          },
+                          "curso": {
+                            "type": "string",
+                            "example": "Exemplo Curso"
+                          },
+                          "ano_graduacao": {
+                            "type": "integer",
+                            "example": 2024
+                          },
+                          "telefone": {
+                            "type": "string",
+                            "example": "(XX)XXXXX-XXXX"
+                          },
+                          "cidade": {
+                            "type": "string",
+                            "example": "Exemplo Cidade"
+                          },
+                          "estado": {
+                            "type": "string",
+                            "example": "EX"
+                          },
+                          "pais": {
+                            "type": "string",
+                            "example": "Exemplo País"
+                          },
+                          "cpf": {
+                            "type": "string",
+                            "example": "XXX.XXX.XXX-XX"
+                          },
+                          "modalidade_estagio": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "example": ["Exemplo Modalidade"]
+                          },
+                          "competencias": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "example": ["Exemplo Competência 1", "Exemplo Competência 2"]
+                          },
+                          "ja_estagiou": {
+                            "type": "boolean",
+                            "example": true
+                          },
+                          "autoriza_dados": {
+                            "type": "boolean",
+                            "example": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "status": "sucesso",
+                  "data": [
+                    {
+                      "nome": "Exemplo Aluno 1",
+                      "email": "aluno1@exemplo.com",
+                      "universidade": "Exemplo Universidade",
+                      "curso": "Exemplo Curso",
+                      "ano_graduacao": 2024,
+                      "telefone": "(XX)XXXXX-XXXX",
+                      "cidade": "Exemplo Cidade",
+                      "estado": "EX",
+                      "pais": "Exemplo País",
+                      "cpf": "XXX.XXX.XXX-XX",
+                      "modalidade_estagio": ["Exemplo Modalidade"],
+                      "competencias": ["Exemplo Competência 1", "Exemplo Competência 2"],
+                      "ja_estagiou": true,
+                      "autoriza_dados": true
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erros na validação dos dados da planilha. Retorna críticas detalhadas para cada registro inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "criticas"
+                    },
+                    "erros": {
+                      "type": "object",
+                      "description": "Objeto onde cada chave representa um registro (identificado pelo CPF e Nome) e o valor é um array de mensagens de erro.",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "status": "criticas",
+                  "erros": {
+                    "XXX.XXX.XXX-XX: Exemplo Aluno Incompleto": [
+                      "Campo obrigatório 'Email de contato' está vazio."
+                    ],
+                    "cpf não localizado: Exemplo Aluno Inexistente": [
+                      "Campo obrigatório 'CPF (só números)' está vazio."
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno no servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "Erro no processamento da planilha."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
