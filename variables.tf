@@ -10,6 +10,18 @@ variable "function_name" {
   default     = "fastapi_lambda_function"
 }
 
+variable "account_id" {
+  description = "The Account ID"
+  type        = string
+  default     = "058264215162"
+}
+
+variable "dynamodb_table" {
+  description = "The name of DynamoDB Table for Lambda function"
+  type        = string
+  default     = "poli_fastapi_table_students"
+}
+
 variable "runtime" {
   description = "The runtime environment for the Lambda function"
   type        = string
@@ -31,7 +43,7 @@ variable "memory_size" {
 variable "timeout" {
   description = "The amount of time that Lambda allows a function to run before stopping it"
   type        = number
-  default     = 3
+  default     = 10
 }
 
 variable "api_gateway_stage" {

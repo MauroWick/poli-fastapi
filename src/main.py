@@ -2,11 +2,14 @@ import io
 import re
 import logging
 
+import boto3
 import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from mangum import Mangum
+
+dynamodb = boto3.client("dynamodb")
 
 app = FastAPI(
     title="Poli-API",
@@ -261,9 +264,16 @@ fake_alunos = [
 ]
 
 
-@app.get("/alunos/{aluno_id}", response_model=Aluno)
-async def get_aluno(aluno_id: int):
-    return fake_aluno
+@app.get("/alunos/{cpf}")
+async def get_aluno(cpf: str):
+    item = dynamodb.get_item(
+        TableName="poli_fastapi_table_students", 
+        Key={"cpf": {"S": cpf}}
+    )
+    if item.get("Item"):
+        return {"message": f"Aluno {item["Item"]["cpf"]} encontrado com sucesso!"}
+    else:
+        return {"message": "Aluno não encontrado!"}
 
 
 @app.get("/alunos", response_model=list[Aluno])
@@ -283,7 +293,7 @@ async def upload_spreadsheet(file: UploadFile = File(...)):
         logger.error(f"Erro ao processar a planilha: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-    
+
 lambda_handler = Mangum(app)
 
 
