@@ -4,12 +4,14 @@ import logging
 
 import boto3
 import pandas as pd
+from datetime import datetime
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from mangum import Mangum
 
-dynamodb = boto3.client("dynamodb")
+dynamodb = boto3.client("dynamodb", region_name="us-east-1")
 
 app = FastAPI(
     title="Poli-API",
@@ -38,9 +40,12 @@ REQUIRED_COLUMNS = [
 ALL_COLUMNS = [
     "Nome",
     "Email de contato",
+    "Email institucional",
     "Universidade",
     "Curso",
     "Ano de graduação",
+    "Aberto a propostas de trabalho",
+    "Áreas de interesse",
     "Telefone",
     "Cidade",
     "Estado",
@@ -50,9 +55,6 @@ ALL_COLUMNS = [
     "Competências",
     "Já estagiou?/ Está estagiando?",
     "Você autoriza o compartilhamento dos seus dados para os bancos de talentos das empresas presentes no WI34?",
-    "Email institucional",
-    "Aberto a propostas de trabalho",
-    "Áreas de interesse",
     "Organizações estudantis",
     "LinkedIn",
     "Currículo",
@@ -75,17 +77,33 @@ ALL_COLUMNS = [
 COLUMN_MAPPING = {
     "Nome": "nome",
     "Email de contato": "email",
+    "Email institucional": "email_institucional",
     "Universidade": "universidade",
     "Curso": "curso",
     "Ano de graduação": "ano_graduacao",
+    "Aberto a propostas de trabalho": "aberto_proposta_trabalho",
+    "Áreas de interesse": "areas_interesse",
     "Telefone": "telefone",
+    "Etnia": "etnia",
+    "PCD": "pcd",
+    "LGBTQIA+": "lgbtqia",
     "Cidade": "cidade",
     "Estado": "estado",
     "País": "pais",
+    "Data de nascimento (DD/MM/AA)": "data_nascimento",
     "CPF (só números)": "cpf",
+    "Ano de ingresso na universidade": "ano_ingresso",
+    "Previsão Formatura": "previsao_formatura",
+    "Nível de Espanhol": "nivel_espanhol",
+    "Nível de Inglês": "nivel_ingles",
+    "Nível de Excel": "nivel_excel",
+    "Setores de Interesse": "setores_interesse",
     "Modalidades de estágio buscadas": "modalidade_estagio",
+    "Qual é a primeira empresa que vem à sua mente quando pensa em estagiar?": "primeira_empresa",
     "Competências": "competencias",
+    "Caso tenha outras competências, indique quais": "outras_competencias",
     "Já estagiou?/ Está estagiando?": "ja_estagiou",
+    "Se sim, em qual setor?": "se_sim_setor",
     "Você autoriza o compartilhamento dos seus dados para os bancos de talentos das empresas presentes no WI34?": "autoriza_dados"
 }
 
@@ -97,27 +115,124 @@ logger = logging.getLogger("fastapi_lambda")
 
 class Aluno(BaseModel):
     nome: str = Field(..., max_length=100)
-    email: EmailStr
+    email: EmailStr = Field(..., max_length=50)
+    email_institucional: Optional[EmailStr] = Field(None, max_length=50)
     universidade: str
     curso: str
     ano_graduacao: int = Field(..., ge=1900, le=2100)
+    aberto_proposta_trabalho: Optional[str] = None
+    areas_interesse: Optional[List[str]] = None
+    organizacoes_estudantis: Optional[List[str]] = None
     telefone: str = Field(..., pattern=r"^\(\d{2}\)\s?\d{5}-\d{4}$")
+    etnia: Optional[str] = None
+    lgbtqia: Optional[str] = None
+    pcd: Optional[str] = None
     cidade: str
     estado: str
     pais: str
+    data_nascimento: Optional[str] = None
     cpf: str = Field(..., pattern=r"^\d{3}\.\d{3}\.\d{3}-\d{2}$")
+    ano_ingresso: Optional[int] = None
+    previsao_formatura: Optional[str] = None
+    nivel_espanhol: Optional[str] = None
+    nivel_ingles: Optional[str] = None
+    nivel_excel: Optional[str] = None
+    setores_interesse: Optional[List[str]] = None
     modalidade_estagio: list[str]
+    primeira_empresa: Optional[str] = None
     competencias: list[str]
+    outras_competencias: Optional[List[str]] = None
     ja_estagiou: bool
+    se_sim_setor: Optional[str] = None
     autoriza_dados: bool
 
-    @field_validator("nome", "universidade", "cidade", "estado", "pais")
+    @field_validator("nome", "universidade", "curso", "etnia", "pcd", "lgbtqia", "cidade", "estado", "pais", "nivel_espanhol", "nivel_ingles", "nivel_excel", "primeira_empresa", "se_sim_setor")
     @classmethod
     def validar_texto(cls, v):
+        if not isinstance(v, str):
+            v = str(v) if v is not None else ""
         if re.fullmatch(r"[A-Za-zÀ-ÖØ-öø-ÿ\s]+", v):
             return v
         raise ValueError("Deve conter apenas letras e espaços")
+    
+    @field_validator("email", "email_institucional", mode="before")
+    @classmethod
+    def validate_local_part(cls, v: str):
+        local_part = v.split("@")[0]
+        if len(local_part) > 50:
+            raise ValueError("A parte local do email de contato deve ter no máximo 50 caracteres")
+        return v
 
+    @field_validator("aberto_proposta_trabalho", mode="before")
+    @classmethod
+    def validate_aberto_proposta_trabalho(cls, v):
+        if v is None:
+            return v
+        if not re.fullmatch(r"[A-Za-zÀ-ÖØ-öø-ÿ\s]+", v):
+            raise ValueError("Deve conter apenas letras e espaços")
+        if v.strip().lower() not in {"sim", "não"}:
+            raise ValueError("Valor inválido, use 'Sim' ou 'Não'")
+        return v
+    
+    @field_validator("areas_interesse", mode="before")
+    @classmethod
+    def split_areas_interesse(cls, v):
+        if isinstance(v, str):
+            items = [item.strip() for item in re.split(r"[;,]", v) if item.strip()]
+            if len(items) > 100:
+                raise ValueError("Áreas de Interesse deve conter no máximo 100 itens")
+            return items
+        return v
+    
+    @field_validator("organizacoes_estudantis", mode="before")
+    @classmethod
+    def split_organizacoes_estudantis(cls, v):
+        if isinstance(v, str):
+            items = [item.strip() for item in re.split(r"[;,]", v) if item.strip()]
+            if not all(re.fullmatch(r"[A-Za-zÀ-ÖØ-öø-ÿ\s]+", item) for item in items):
+                raise ValueError("Cada item de Organizações estudantis deve conter apenas letras e espaços")
+            return items
+        return v
+    
+    @field_validator("data_nascimento", mode="before")
+    @classmethod
+    def validate_data_nascimento(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("Data de nascimento deve ser uma string")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+            raise ValueError("Data de nascimento deve estar no formato AAAA-MM-DD")
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except Exception:
+            raise ValueError("Data de nascimento inválida")
+        return v
+    
+    @field_validator("setores_interesse", mode="before")
+    @classmethod
+    def split_setores_interesse(cls, v):
+        if isinstance(v, str):
+            items = [item.strip() for item in re.split(r"[;,]", v) if item.strip()]
+            if len(items) > 100:
+                raise ValueError("Setores de Interesse deve conter no máximo 100 itens")
+            if not all(re.fullmatch(r"[A-Za-zÀ-ÖØ-öø-ÿ\s]+", item) for item in items):
+                raise ValueError("Cada setor de interesse deve conter apenas letras e espaços")
+            return items
+        return v
+    
+    @field_validator("previsao_formatura", mode="before")
+    @classmethod
+    def validate_previsao_formatura(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            v = str(v)
+        if not re.fullmatch(r"\d{4}\.\d", v):
+            raise ValueError("Previsão de Formatura deve estar no formato YYYY.X, ex: 2024.1")
+        return v
+
+    
     @field_validator("modalidade_estagio", mode="before")
     @classmethod
     def split_modalidade(cls, v):
@@ -133,9 +248,21 @@ class Aluno(BaseModel):
     @field_validator("competencias", mode="before")
     @classmethod
     def split_competencias(cls, v):
-        return [comp.strip() for comp in re.split(r'[;,]', v) if comp.strip()] if isinstance(v, str) else v
+        if not isinstance(v, str):
+            return None
+        return [comp.strip() for comp in re.split(r'[;,]', v) if comp.strip()]
 
-    @field_validator("competencias")
+    @field_validator("outras_competencias", mode="before")
+    @classmethod
+    def split_outras_competencias(cls, v):
+        if isinstance(v, str):
+            items = [comp.strip() for comp in re.split(r"[;,]", v) if comp.strip()]
+            if len(items) > 100:
+                raise ValueError("Outras Competências deve conter no máximo 100 itens")
+            return items
+        return v
+    
+    @field_validator("competencias", "outras_competencias")
     @classmethod
     def validar_competencias(cls, v):
         if not isinstance(v, list):
@@ -145,7 +272,7 @@ class Aluno(BaseModel):
         if not all(re.fullmatch(r"[A-Za-zÀ-ÖØ-öø-ÿ\s]+", comp) for comp in v):
             raise ValueError("Cada competência deve conter apenas letras e espaços")
         return v
-
+    
     @field_validator("ja_estagiou", mode="before")
     @classmethod
     def parse_ja_estagiou(cls, v):
@@ -154,7 +281,7 @@ class Aluno(BaseModel):
             False if isinstance(v, str) and v.strip().lower() == "não" else
             (_ for _ in ()).throw(ValueError("Valor inválido para ja_estagiou, use 'Sim' ou 'Não'"))
         )
-
+    
     @field_validator("autoriza_dados", mode="before")
     @classmethod
     def parse_autoriza_dados(cls, v):
@@ -167,6 +294,17 @@ class Aluno(BaseModel):
 def process_spreadsheet(spreadsheet: bytes):
     try:
         df = pd.read_excel(io.BytesIO(spreadsheet))
+        df.fillna("", inplace=True)
+        colunas_texto = ["Nome", "Email de contato", "Email institucional", "Universidade", "Curso",
+                  "Aberto a propostas de trabalho", "Áreas de interesse", "Telefone", "Etnia", "PCD", 
+                  "LGBTQIA+", "Cidade", "Estado", "País", "Data de nascimento (DD/MM/AA)", 
+                  "CPF (só números)", "Previsão Formatura", "Nível de Espanhol", "Nível de Inglês", 
+                  "Nível de Excel", "Setores de Interesse", "Qual é a primeira empresa que vem à sua mente quando pensa em estagiar?", 
+                  "Competências", "Caso tenha outras competências, indique quais", "Já estagiou?/ Está estagiando?", "Se sim, em qual setor?"]
+        for col in colunas_texto:
+            if col in df.columns:
+                df[col] = df[col].apply(lambda x: str(x) if pd.notnull(x) else None)
+
         df = df[[col for col in ALL_COLUMNS if col in df.columns]]
 
         missing_cols = [col for col in REQUIRED_COLUMNS if col not in df.columns]
@@ -199,7 +337,10 @@ def process_spreadsheet(spreadsheet: bytes):
                 aluno = Aluno(**data)
                 valid_alunos.append(aluno.dict())
             except Exception as exc:
-                criticas[key] = [f"Erro de validação: {exc.errors()}"]
+                if hasattr(exc, "errors"):
+                    criticas[key] = [f"Erro de validação: {exc.errors()}"]
+                else:
+                    criticas[key] = [f"Erro de validação: {str(exc)}"]
 
         unique_fields = ["Nome", "Email de contato", "Telefone", "CPF (só números)"]
         for field in unique_fields:
@@ -227,43 +368,6 @@ def process_spreadsheet(spreadsheet: bytes):
         raise HTTPException(status_code=500, detail="Erro no processamento da planilha.")
 
 
-fake_aluno = Aluno(
-    nome="John Doe",
-    email="johndoe@example.com",
-    universidade="UniversidadeExemplo",
-    curso="CursoExemplo",
-    ano_graduacao=2024,
-    telefone="(11)91234-5678",
-    cidade="CidadeExemplo",
-    estado="EstadoExemplo",
-    pais="PaisExemplo",
-    cpf="123.456.789-00",
-    modalidade_estagio=["Remoto"],
-    competencias=["Python", "FastAPI"],
-    ja_estagiou=True,
-    autoriza_dados=True
-)
-
-fake_alunos = [
-    Aluno(
-        nome=f"John Doe {chr(65+i)}",
-        email=f"johndoe{i}@example.com",
-        universidade="UniversidadeExemplo",
-        curso=f"Curso{i}Exemplo",
-        ano_graduacao=2024,
-        telefone=f"(11)91234-56{78 + i:02d}",
-        cidade="CidadeExemplo",
-        estado="EstadoExemplo",
-        pais="PaisExemplo",
-        cpf=f"123.456.789-{i:02d}",
-        modalidade_estagio=["Remoto"],
-        competencias=["Python", "FastAPI"],
-        ja_estagiou=True,
-        autoriza_dados=True
-    ) for i in range(10)
-]
-
-
 @app.get("/alunos/{cpf}")
 async def get_aluno(cpf: str):
     item = dynamodb.get_item(
@@ -274,12 +378,6 @@ async def get_aluno(cpf: str):
         return {"message": f"Aluno {item["Item"]["cpf"]} encontrado com sucesso!"}
     else:
         return {"message": "Aluno não encontrado!"}
-
-
-@app.get("/alunos", response_model=list[Aluno])
-async def get_alunos():
-    return fake_alunos
-
 
 @app.post("/upload_spreadsheet")
 async def upload_spreadsheet(file: UploadFile = File(...)):
@@ -299,6 +397,6 @@ lambda_handler = Mangum(app)
 
 # http://localhost:8000/docs (para acessar o swagger em sua maquina local)
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
