@@ -3,6 +3,7 @@ import io
 import re
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from mangum import Mangum
 import pandas as pd
@@ -10,6 +11,14 @@ import pandas as pd
 
 app = FastAPI()
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class Aluno(BaseModel):
@@ -45,6 +54,7 @@ fake_aluno = Aluno(
     ja_estagiou=True,
     autoriza_dados=True
 )
+
 fake_alunos = [
     Aluno(
         nome=f"John Doe {i}",
